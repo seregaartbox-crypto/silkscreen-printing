@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Шелкография Калькулятор v1.5</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
+        
+        body { 
+            font-family: -apple-system, system-ui, sans-serif; 
+            background: var(--bg); color: var(--text); 
+            margin: 0; padding: 10px; padding-bottom: 120px; 
+        }
+
+        .container { max-width: 800px; margin: 0 auto; }
+        
+        header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 15px; padding: 0 5px;
+        }
+
+        h1 { font-size: 1.1rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .btn { padding: 12px 18px; border-radius: 10px; cursor: pointer; border: none; font-weight: 600; font-size: 14px; transition: 0.2s; }
+        .btn-add { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
+
+        .print-card { 
+            background: var(--card); border-radius: 16px; padding: 15px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; 
+            border: 1px solid #e2e8f0; outline: none; position: relative;
+        }
+
+        .card-body { display: flex; flex-direction: column; gap: 15px; }
+        @media (min-width: 600px) { .card-body { flex-direction: row; } }
+
+        .image-container {
+            width: 100%; aspect-ratio: 1/1; max-width: 140px;
+            background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; cursor: pointer; margin: 0 auto; overflow: hidden;
+        }
+        .image-container img { width: 100%; height: 100%; object-fit: contain; }
+        .image-container span { font-size: 10px; color: #64748b; text-align: center; padding: 5px; }
+
+        .params-grid { 
+            display: grid; grid-template-columns: 1fr 1fr; 
+            gap: 12px; flex-grow: 1;
+        }
+
+        .field { display: flex; flex-direction: column; }
+        label { font-size: 10px; font-weight: 700; margin-bottom: 4px; color: #64748b; text-transform: uppercase; }
+        
+        input, select { 
+            -webkit-appearance: none; padding: 10px; 
+            border: 1px solid #cbd5e1; border-radius: 8px; 
+            font-size: 15px; background: white; width: 100%; box-sizing: border-box;
+        }
+
+        .full-row { grid-column: span 2; }
+        
+        /* Исправленный чекбокс */
+        .checkbox-row { 
+            grid-column: span 2; display: flex; align-items: center; 
+            gap: 12px; background: #eff6ff; padding: 12px; 
+            border-radius: 10px; border: 1px solid #bfdbfe; cursor: pointer;
+        }
+        .checkbox-row input[type="checkbox"] { 
+            -webkit-appearance: checkbox; /* Возвращаем стандартный вид для мобильных */
+            width: 22px; height: 22px; margin: 0; cursor: pointer;
+            accent-color: var(--primary); /* Красим в синий */
+        }
+        .checkbox-label { margin: 0; font-size: 13px; font-weight: 600; color: #1e40af; cursor: pointer; }
+
+        .footer-total { 
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #1e293b; color: white; padding: 15px 20px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            z-index: 100; box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
+        }
+
+        .total-val { font-size: 26px; font-weight: 800; color: #60a5fa; }
+        .qty-input-group { display: flex; flex-direction: column; gap: 2px; }
+        .qty-input-group input { 
+            width: 90px; text-align: center; font-weight: 800; 
+            background: #334155; border: 1px solid #475569; color: white; 
+            border-radius: 6px; font-size: 18px;
+        }
+        
+        .hidden { display: none !important; }
+
+        .unit-badge { background: #e0f2fe; color: var(--primary); padding: 4px 8px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Калькулятор v1.5</h1>
+        <button class="btn btn-add" onclick="addPrintCard()">+ ПРИНТ</button>
+    </header>
+    <div id="printContainer"></div>
+</div>
+
+<div class="footer-total">
+    <div class="qty-input-group">
+        <label style="color: #94a3b8;">ТИРАЖ</label>
+        <input type="number" id="globalQty" value="50" oninput="calculateAll()">
+    </div>
+    <div style="text-align: right;">
+        <div class="total-val" id="grandTotal">0 ₽</div>
+        <div style="font-size: 13px; opacity: 0.8;">За 1 изд: <span id="grandPerItem">0</span> ₽</div>
+    </div>
+</div>
+
+<script>
+let cardCount = 0;
+
+const configs = {
+    pocket: {
+        tiers: [50, 100, 250, 500, 700, 1000],
+        grid: [[112,60,43,33,29,23],[174,100,71,54,46,38],[230,137,98,75,65,52],[290,178,126,96,83,67],[349,218,154,117,101,82],[408,258,182,139,120,97],[467,298,210,160,138,112],[526,338,238,181,157,127]],
+        small: [240, 480, 720, 960, 1200, 1440, 1680, 1920],
+        areas: [{n:"до 10х10",v:0}, {n:"10х10-15х20",v:15}, {n:"15х20-20х30",v:25}, {n:"20х30-30х40",v:40}]
+    },
+    back: {
+        tiers: [50, 100, 200, 300, 500, 700, 1000],
+        grid: [[180,108,86,72,58,51,44],[285,172,136,115,93,80,70],[384,231,185,156,126,109,95],[482,291,233,197,159,137,120],[580,351,281,237,192,166,145],[678,411,329,278,225,194,170],[776,471,377,318,258,223,195],[874,531,425,359,291,251,220]],
+        small: [420, 840, 1260, 1680, 2100, 2520, 2940, 3360],
+        areas: [{n:"до 30х35",v:0}, {n:"30х35-38х48",v:40}, {n:"38х48-45х55",v:65}, {n:"45х55-50х70",v:100}]
+    },
+    tshirt: {
+        tiers: [50, 100, 200, 300, 500, 1000],
+        grid: [[104,57,43,35,31,26],[163,91,71,57,51,41],[223,125,98,79,71,57],[282,160,126,101,91,73],[342,195,154,123,111,89],[401,229,182,146,131,105],[461,264,210,168,151,121],[520,298,238,190,171,137]],
+        small: [340, 680, 1020, 1360, 1700, 2040, 2380, 2720]
+    }
+};
+
+function addPrintCard() {
+    cardCount++;
+    const cardId = `card-${cardCount}`;
+    const html = `
+        <div class="print-card" id="${cardId}" tabindex="0" onpaste="handlePaste(event, '${cardId}')">
+            <div class="card-body">
+                <div class="image-container" onclick="this.querySelector('input').click()">
+                    <img id="img-prev-${cardId}" style="display:none">
+                    <span id="txt-${cardId}">Нажми или Ctrl+V</span>
+                    <input type="file" hidden accept="image/*" onchange="previewImage(this, '${cardId}')">
+                </div>
+                <div class="params-grid">
+                    <div class="field full-row">
+                        <label>Тип печати</label>
+                        <select class="type-sel" onchange="updateCardUI('${cardId}'); calculateAll();">
+                            <option value="pocket">Карман / Трансфер</option>
+                            <option value="back">Спина / Трансфер</option>
+                            <option value="tshirt">Футболки (Прямая)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Цвета</label>
+                        <input type="number" class="colors" value="1" min="1" max="8" oninput="calculateAll()">
+                    </div>
+                    <div class="field trans-only">
+                        <label>Размер лого</label>
+                        <select class="area-sel" onchange="calculateAll()"></select>
+                    </div>
+                    <div class="field tshirt-only hidden">
+                        <label>Ткань</label>
+                        <select class="fabric-type" onchange="calculateAll()">
+                            <option value="1">Хлопок</option>
+                            <option value="1.1">Синтетика (+10%)</option>
+                            <option value="1.25">Пропитка (+25%)</option>
+                        </select>
+                    </div>
+                    <div class="field tshirt-only hidden">
+                        <label>Сложность</label>
+                        <select class="item-diff" onchange="calculateAll()">
+                            <option value="1">Изделие</option>
+                            <option value="1.2">Толстовка (+20%)</option>
+                            <option value="0.8">Крой (-20%)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Эффект</label>
+                        <select class="effect-sel" onchange="calculateAll()">
+                            <option value="0">Нет</option>
+                            <option value="0.20">Плашка</option>
+                            <option value="0.25">Металлик</option>
+                            <option value="0.35" class="tshirt-only hidden">Вытравка</option>
+                        </select>
+                    </div>
+                    <div class="field tshirt-only hidden">
+                        <label>Пантоны (шт)</label>
+                        <input type="number" class="pantones" value="0" min="0" oninput="calculateAll()">
+                    </div>
+                    <div class="field">
+                        <label>Нац. %</label>
+                        <input type="number" class="markup" value="0" oninput="calculateAll()">
+                    </div>
+                    <div class="field">
+                        <label>Скид. %</label>
+                        <input type="number" class="discount" value="0" oninput="calculateAll()">
+                    </div>
+                    
+                    <label class="checkbox-row tshirt-only hidden">
+                        <input type="checkbox" class="colored-base" onchange="calculateAll()">
+                        <span class="checkbox-label">Цветной крой (+1 цвет)</span>
+                    </label>
+                </div>
+            </div>
+            <div style="margin-top:12px; font-size:13px; font-weight:bold; color:var(--text); display:flex; justify-content:space-between; align-items:center;">
+                <span>1 принт: <span class="unit-badge"><span class="unit-price">0</span> ₽</span></span>
+                <span style="color:var(--danger); cursor:pointer; font-size:11px; font-weight:800;" onclick="removeCard('${cardId}')">УДАЛИТЬ ✕</span>
+            </div>
+        </div>
+    `;
+    document.getElementById('printContainer').insertAdjacentHTML('beforeend', html);
+    updateCardUI(cardId);
+    calculateAll();
+}
+
+function updateCardUI(cardId) {
+    const card = document.getElementById(cardId);
+    const type = card.querySelector('.type-sel').value;
+    card.querySelectorAll('.tshirt-only').forEach(el => el.classList.toggle('hidden', type !== 'tshirt'));
+    card.querySelectorAll('.trans-only').forEach(el => el.classList.toggle('hidden', type === 'tshirt'));
+    if (type !== 'tshirt') {
+        card.querySelector('.area-sel').innerHTML = configs[type].areas.map(a => `<option value="${a.v}">${a.n}</option>`).join('');
+    }
+}
+
+function handlePaste(e, cardId) {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let item of items) {
+        if (item.type.indexOf("image") !== -1) {
+            const blob = item.getAsFile();
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = document.getElementById(`img-prev-${cardId}`);
+                img.src = ev.target.result; img.style.display = "block";
+                document.getElementById(`txt-${cardId}`).style.display = "none";
+            };
+            reader.readAsDataURL(blob);
+        }
+    }
+}
+
+function previewImage(input, cardId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById(`img-prev-${cardId}`).src = e.target.result;
+            document.getElementById(`img-prev-${cardId}`).style.display = "block";
+            document.getElementById(`txt-${cardId}`).style.display = "none";
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function removeCard(id) { document.getElementById(id).remove(); calculateAll(); }
+
+function calculateAll() {
+    const globalQty = parseFloat(document.getElementById('globalQty').value) || 0;
+    let totalSum = 0;
+    if (globalQty <= 0) return;
+
+    document.querySelectorAll('.print-card').forEach(card => {
+        const type = card.querySelector('.type-sel').value;
+        const conf = configs[type];
+        
+        let colors = (parseInt(card.querySelector('.colors').value) || 1);
+        if (type === 'tshirt' && card.querySelector('.colored-base').checked) colors += 1;
+        const colorIdx = Math.min(Math.max(colors, 1), 8) - 1;
+
+        let base = 0;
+        if (globalQty < 50) {
+            base = conf.small[colorIdx];
+        } else {
+            let l = 0;
+            for (let i = 0; i < conf.tiers.length; i++) { if (globalQty >= conf.tiers[i]) l = i; }
+            let r = Math.min(l + 1, conf.tiers.length - 1);
+            const qL = conf.tiers[l], qR = conf.tiers[r];
+            const pL = conf.grid[colorIdx][l], pR = conf.grid[colorIdx][r];
+            base = (qL === qR) ? pL * globalQty : (pL + (pR - pL) * (globalQty - qL) / (qR - qL)) * globalQty;
+        }
+
+        let finalSum = 0;
+        if (type === 'tshirt') {
+            const fabMod = parseFloat(card.querySelector('.fabric-type').value);
+            const diffMod = parseFloat(card.querySelector('.item-diff').value);
+            const effMod = 1 + parseFloat(card.querySelector('.effect-sel').value);
+            const pantSum = (parseInt(card.querySelector('.pantones').value) || 0) * 500;
+            finalSum = (base * fabMod * diffMod * effMod) + pantSum;
+        } else {
+            const effMod = 1 + parseFloat(card.querySelector('.effect-sel').value);
+            const areaAdd = parseFloat(card.querySelector('.area-sel').value) * globalQty;
+            finalSum = (base * effMod) + areaAdd;
+        }
+
+        const res = Math.ceil(finalSum * 1.05 * (1 + (parseFloat(card.querySelector('.markup').value)||0)/100 - (parseFloat(card.querySelector('.discount').value)||0)/100));
+        card.querySelector('.unit-price').innerText = Math.ceil(res / globalQty).toLocaleString();
+        totalSum += res;
+    });
+
+    document.getElementById('grandTotal').innerText = totalSum.toLocaleString() + " ₽";
+    document.getElementById('grandPerItem').innerText = Math.ceil(totalSum / globalQty).toLocaleString() + " ₽";
+}
+
+// Стартовый принт
+addPrintCard();
+</script>
+</body>
+</html>
